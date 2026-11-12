@@ -1,15 +1,15 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { getJakartaDateString } from '../utils/formatters';
 
 const StoreContext = createContext();
 
-const AUTH_PINS_KEY = 'livara_auth_pins_v1';
 const AUTH_ROLE_SESSION = 'livara_active_role_v1';
 
 export function StoreProvider({ children }) {
-  const [products, setProducts] = useState(() => storageService.loadData().products);
-  const [mutations, setMutations] = useState(() => storageService.loadData().mutations);
+  const [products, setProducts] = useState([]);
+  const [mutations, setMutations] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('stok');
   const [toastMsg, setToastMsg] = useState('');
 
@@ -17,29 +17,40 @@ export function StoreProvider({ children }) {
   const [userRole, setUserRole] = useState(
     () => sessionStorage.getItem(AUTH_ROLE_SESSION) || 'viewer'
   );
-  const [pins, setPins] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(AUTH_PINS_KEY));
-      return saved || { staffPin: '1111', ownerPin: '1234' };
-    } catch {
-      return { staffPin: '1111', ownerPin: '1234' };
-    }
-  });
+  const [pins, setPins] = useState({ staffPin: '1111', ownerPin: '1234' });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const canEdit = userRole === 'staff' || userRole === 'owner';
   const isOwner = userRole === 'owner';
 
-  const syncStorage = (newProducts, newMutations) => {
-    setProducts(newProducts);
-    setMutations(newMutations);
-    storageService.saveData({ products: newProducts, mutations: newMutations });
-  };
-
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 3000);
   };
+
+  // Muat data dari Supabase Cloud saat aplikasi pertama kali dibuka
+  useEffect(() => {
+    let isMounted = true;
+    async function initCloudData() {
+      setDataLoading(true);
+      try {
+        const cloud = await storageService.fetchAllData();
+        if (isMounted) {
+          setProducts(cloud.products);
+          setMutations(cloud.mutations);
+          if (cloud.pins) setPins(cloud.pins);
+        }
+      } catch (err) {
+        console.error('Gagal mengambil data dari Supabase:', err);
+      } finally {
+        if (isMounted) setDataLoading(false);
+      }
+    }
+    initCloudData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // --- FUNGSI LOGIN & LOGOUT ---
   const loginWithPin = (inputPin) => {
@@ -68,85 +79,97 @@ export function StoreProvider({ children }) {
     showToast('Kembali ke Mode Lihat Saja (Terkunci)');
   };
 
-  const updatePins = (newStaffPin, newOwnerPin) => {
+  const updatePins = async (newStaffPin, newOwnerPin) => {
     const nextPins = {
       staffPin: String(newStaffPin).trim() || pins.staffPin,
       ownerPin: String(newOwnerPin).trim() || pins.ownerPin
     };
     setPins(nextPins);
-    localStorage.setItem(AUTH_PINS_KEY, JSON.stringify(nextPins));
-    showToast('PIN Keamanan Gudang berhasil diperbarui!');
+    await storageService.savePinsToCloud(nextPins);
+    showToast('PIN Keamanan Gudang berhasil disimpan ke Cloud!');
   };
 
-  // --- MASTER BARANG / STOK ---
-  const saveProduct = (prodData) => {
+  // --- MASTER BARANG / STOK (SINKRON KE SUPABASE) ---
+  const saveProduct = async (prodData) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
+    let targetProd;
     let updatedProducts;
+
     if (prodData.id) {
-      updatedProducts = products.map((p) => (p.id === prodData.id ? { ...p, ...prodData } : p));
-      showToast('Data barang berhasil diperbarui!');
+      targetProd = { ...prodData };
+      updatedProducts = products.map((p) => (p.id === prodData.id ? targetProd : p));
+      showToast('Data barang berhasil diperbarui di Cloud!');
     } else {
-      const newProd = {
+      targetProd = {
         ...prodData,
         id: 'prd_' + Date.now() + Math.random().toString(36).slice(2, 6)
       };
-      updatedProducts = [newProd, ...products];
-      showToast('Barang baru ditambahkan ke gudang!');
+      updatedProducts = [targetProd, ...products];
+      showToast('Barang baru ditambahkan ke Cloud Gudang!');
     }
-    syncStorage(updatedProducts, mutations);
+
+    setProducts(updatedProducts);
+    await storageService.upsertProducts([targetProd]);
   };
 
-  const adjustStockQuick = (productId, delta) => {
+  const adjustStockQuick = async (productId, delta) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
+    let changedProd = null;
     const updatedProducts = products.map((p) => {
       if (p.id === productId) {
         const nextStock = Math.max(0, Number(p.stock) + delta);
-        return { ...p, stock: nextStock };
+        changedProd = { ...p, stock: nextStock };
+        return changedProd;
       }
       return p;
     });
-    syncStorage(updatedProducts, mutations);
+
+    setProducts(updatedProducts);
+    if (changedProd) {
+      await storageService.upsertProducts([changedProd]);
+    }
   };
 
-  const deleteProduct = (productId) => {
+  const deleteProduct = async (productId) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
-    const updatedProducts = products.filter((p) => p.id !== productId);
-    syncStorage(updatedProducts, mutations);
-    showToast('Barang dihapus dari master stok');
+    setProducts(products.filter((p) => p.id !== productId));
+    await storageService.deleteProductById(productId);
+    showToast('Barang dihapus dari database gudang');
   };
 
-  // --- MUTASI BARANG MASUK & KELUAR PROYEK ---
-// --- MUTASI BARANG MASUK, KELUAR PROYEK, & BARANG RUSAK ---
-  const createMutation = (payload) => {
+  // --- MUTASI BARANG MASUK, KELUAR PROYEK, & BARANG RUSAK ---
+  const createMutation = async (payload) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
-    // Baik 'OUT' (Keluar Proyek) maupun 'DAMAGED' (Barang Rusak/Sample) sama-sama mengurangi stok ready
     const isDeducting = payload.type === 'OUT' || payload.type === 'DAMAGED';
+    const affectedProducts = [];
 
     const updatedProducts = products.map((p) => {
       const found = payload.items.find((it) => it.productId === p.id);
       if (!found) return p;
       const delta = isDeducting ? -Number(found.qty) : Number(found.qty);
-      return {
+      const nextProd = {
         ...p,
         stock: Math.max(0, Number(p.stock) + delta)
       };
+      affectedProducts.push(nextProd);
+      return nextProd;
     });
 
     const newMutation = {
       id: 'mut_' + Date.now(),
-      type: payload.type, // 'IN' | 'OUT' | 'DAMAGED'
+      type: payload.type,
       date: payload.date || getJakartaDateString(),
       createdAt: new Date().toISOString(),
       supplier: payload.supplier || '',
@@ -160,19 +183,25 @@ export function StoreProvider({ children }) {
       returnLogs: []
     };
 
-    const updatedMutations = [newMutation, ...mutations];
-    syncStorage(updatedProducts, updatedMutations);
+    setProducts(updatedProducts);
+    setMutations([newMutation, ...mutations]);
+
+    await Promise.all([
+      storageService.upsertProducts(affectedProducts),
+      storageService.upsertMutation(newMutation)
+    ]);
+
     showToast(
       payload.type === 'IN'
-        ? 'Stok masuk berhasil ditambahkan ke stok ready!'
+        ? 'Stok masuk berhasil disimpan ke Cloud!'
         : payload.type === 'DAMAGED'
-        ? 'Barang rusak/sample tercatat & stok ready dikurangi!'
-        : 'Barang keluar proyek tercatat & stok ready dikurangi!'
+        ? 'Barang rusak/sample tercatat di Cloud!'
+        : 'Barang keluar proyek tercatat di Cloud!'
     );
   };
 
   // --- FITUR BARANG LEBIH (SISA PROYEK KEMBALI KE STOK READY) ---
-  const recordExcessReturn = (mutationId, returnMap, returnNote = '') => {
+  const recordExcessReturn = async (mutationId, returnMap, returnNote = '') => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
@@ -181,6 +210,7 @@ export function StoreProvider({ children }) {
     if (!targetMut || targetMut.type !== 'OUT') return;
 
     const summaryParts = [];
+    const affectedProducts = [];
     let updatedProducts = [...products];
 
     const updatedItems = targetMut.items.map((item) => {
@@ -191,9 +221,14 @@ export function StoreProvider({ children }) {
       const validReturn = Math.min(addReturn, maxReturnable);
 
       if (validReturn > 0) {
-        updatedProducts = updatedProducts.map((p) =>
-          p.id === item.productId ? { ...p, stock: Number(p.stock) + validReturn } : p
-        );
+        updatedProducts = updatedProducts.map((p) => {
+          if (p.id === item.productId) {
+            const nextProd = { ...p, stock: Number(p.stock) + validReturn };
+            affectedProducts.push(nextProd);
+            return nextProd;
+          }
+          return p;
+        });
         summaryParts.push(`${validReturn} ${item.unit} ${item.name}`);
       }
 
@@ -215,21 +250,24 @@ export function StoreProvider({ children }) {
       }`
     };
 
-    const updatedMutations = mutations.map((m) =>
-      m.id === mutationId
-        ? {
-            ...m,
-            items: updatedItems,
-            returnLogs: [...(m.returnLogs || []), logEntry]
-          }
-        : m
-    );
+    const updatedMutObj = {
+      ...targetMut,
+      items: updatedItems,
+      returnLogs: [...(targetMut.returnLogs || []), logEntry]
+    };
 
-    syncStorage(updatedProducts, updatedMutations);
-    showToast('Barang lebih berhasil dikembalikan ke Stok Ready!');
+    setProducts(updatedProducts);
+    setMutations(mutations.map((m) => (m.id === mutationId ? updatedMutObj : m)));
+
+    await Promise.all([
+      storageService.upsertProducts(affectedProducts),
+      storageService.upsertMutation(updatedMutObj)
+    ]);
+
+    showToast('Barang lebih berhasil dikembalikan ke Stok Ready Cloud!');
   };
 
-  const deleteMutation = (mutationId) => {
+  const deleteMutation = async (mutationId) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
@@ -237,51 +275,71 @@ export function StoreProvider({ children }) {
     const target = mutations.find((m) => m.id === mutationId);
     if (!target) return;
 
+    const affectedProducts = [];
     const updatedProducts = products.map((p) => {
       const item = target.items.find((it) => it.productId === p.id);
       if (!item) return p;
 
+      let nextProd;
       if (target.type === 'IN') {
-        return { ...p, stock: Number(p.stock) - Number(item.qty) };
+        nextProd = { ...p, stock: Math.max(0, Number(p.stock) - Number(item.qty)) };
       } else {
         const netUsed = Number(item.qty) - (Number(item.returnedQty) || 0);
-        return { ...p, stock: Number(p.stock) + netUsed };
+        nextProd = { ...p, stock: Number(p.stock) + netUsed };
       }
+      affectedProducts.push(nextProd);
+      return nextProd;
     });
 
-    const updatedMutations = mutations.filter((m) => m.id !== mutationId);
-    syncStorage(updatedProducts, updatedMutations);
-    showToast('Catatan mutasi dihapus & stok disesuaikan kembali');
+    setProducts(updatedProducts);
+    setMutations(mutations.filter((m) => m.id !== mutationId));
+
+    await Promise.all([
+      storageService.upsertProducts(affectedProducts),
+      storageService.deleteMutationById(mutationId)
+    ]);
+
+    showToast('Catatan mutasi dihapus & stok Cloud disesuaikan kembali');
   };
 
-  const loadSample = () => {
+  const loadSample = async () => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
+    setDataLoading(true);
     const sample = storageService.getSampleData();
-    syncStorage(sample.products, sample.mutations);
-    showToast('Data contoh Livara Interior berhasil dimuat!');
+    setProducts(sample.products);
+    setMutations(sample.mutations);
+    await storageService.replaceAllCloudData(sample.products, sample.mutations);
+    setDataLoading(false);
+    showToast('Data contoh berhasil dimuat ke Cloud Supabase!');
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     if (!isOwner) {
       alert('Hanya Owner yang dapat menghapus seluruh data gudang!');
       return;
     }
-    const empty = storageService.clearData();
-    setProducts(empty.products);
-    setMutations(empty.mutations);
-    showToast('Semua data gudang telah dikosongkan');
+    setDataLoading(true);
+    setProducts([]);
+    setMutations([]);
+    await storageService.replaceAllCloudData([], []);
+    setDataLoading(false);
+    showToast('Semua data gudang di Cloud telah dikosongkan');
   };
 
-  const restoreFromJson = (parsedData) => {
+  const restoreFromJson = async (parsedData) => {
     if (!canEdit) {
       setIsLoginModalOpen(true);
       return;
     }
-    syncStorage(parsedData.products, parsedData.mutations);
-    showToast('Data backup gudang berhasil dipulihkan!');
+    setDataLoading(true);
+    setProducts(parsedData.products);
+    setMutations(parsedData.mutations);
+    await storageService.replaceAllCloudData(parsedData.products, parsedData.mutations);
+    setDataLoading(false);
+    showToast('Data backup berhasil dipulihkan ke Cloud Supabase!');
   };
 
   return (
@@ -289,6 +347,7 @@ export function StoreProvider({ children }) {
       value={{
         products,
         mutations,
+        dataLoading,
         activeTab,
         setActiveTab,
         toastMsg,

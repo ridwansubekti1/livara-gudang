@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Kunci Rahasia Environment (Wajib di-ignore agar tidak bocor ke GitHub)
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

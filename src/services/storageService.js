@@ -1,41 +1,121 @@
+import { supabase } from './supabaseClient';
 import { getJakartaDateString } from '../utils/formatters';
 
-const STORAGE_KEY = 'livara_interior_warehouse_v1';
+// Mapper Product: PostgreSQL (snake_case) <-> React (camelCase)
+const mapProdFromDb = (row) => ({
+  id: row.id,
+  code: row.code,
+  name: row.name,
+  category: row.category,
+  unit: row.unit || 'Lembar',
+  costPrice: Number(row.cost_price) || 0,
+  sellPrice: Number(row.sell_price) || 0,
+  stock: Number(row.stock) || 0,
+  minStock: row.min_stock !== null && row.min_stock !== undefined ? Number(row.min_stock) : 5
+});
 
-const defaultState = {
-  products: [],
-  mutations: []
-};
+const mapProdToDb = (p) => ({
+  id: p.id,
+  code: p.code,
+  name: p.name,
+  category: p.category,
+  unit: p.unit || 'Lembar',
+  cost_price: Number(p.costPrice) || 0,
+  sell_price: Number(p.sellPrice) || 0,
+  stock: Number(p.stock) || 0,
+  min_stock: p.minStock !== null && p.minStock !== undefined && p.minStock !== '' ? Number(p.minStock) : 5
+});
+
+// Mapper Mutation: PostgreSQL (snake_case) <-> React (camelCase)
+const mapMutFromDb = (row) => ({
+  id: row.id,
+  type: row.type,
+  date: row.date,
+  createdAt: row.created_at,
+  supplier: row.supplier || '',
+  projectName: row.project_name || '',
+  picName: row.pic_name || '',
+  note: row.note || '',
+  items: Array.isArray(row.items) ? row.items : [],
+  returnLogs: Array.isArray(row.return_logs) ? row.return_logs : []
+});
+
+const mapMutToDb = (m) => ({
+  id: m.id,
+  type: m.type,
+  date: m.date,
+  supplier: m.supplier || '',
+  project_name: m.projectName || '',
+  pic_name: m.picName || '',
+  note: m.note || '',
+  items: m.items || [],
+  return_logs: m.returnLogs || []
+});
 
 export const storageService = {
-  loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultState;
-      const parsed = JSON.parse(raw);
-      return {
-        products: Array.isArray(parsed.products) ? parsed.products : [],
-        mutations: Array.isArray(parsed.mutations) ? parsed.mutations : []
-      };
-    } catch (err) {
-      console.error('Gagal memuat data gudang:', err);
-      return defaultState;
-    }
+  // Ambil semua data dari Supabase saat aplikasi dibuka
+  async fetchAllData() {
+    const [prodRes, mutRes, pinRes] = await Promise.all([
+      supabase.from('products').select('*').order('created_at', { ascending: false }),
+      supabase.from('mutations').select('*').order('created_at', { ascending: false }),
+      supabase.from('app_settings').select('*').eq('key', 'pins').maybeSingle()
+    ]);
+
+    if (prodRes.error) console.error('Gagal memuat products:', prodRes.error);
+    if (mutRes.error) console.error('Gagal memuat mutations:', mutRes.error);
+
+    return {
+      products: (prodRes.data || []).map(mapProdFromDb),
+      mutations: (mutRes.data || []).map(mapMutFromDb),
+      pins: pinRes.data?.value || { staffPin: '1111', ownerPin: '1234' }
+    };
   },
 
-  saveData(data) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return true;
-    } catch (err) {
-      console.error('Gagal menyimpan data gudang:', err);
-      return false;
-    }
+  // Simpan / Update 1 atau beberapa produk sekaligus ke Supabase
+  async upsertProducts(productsArray) {
+    if (!productsArray || productsArray.length === 0) return;
+    const rows = productsArray.map(mapProdToDb);
+    const { error } = await supabase.from('products').upsert(rows);
+    if (error) console.error('Error upsertProducts:', error);
   },
 
-  clearData() {
-    localStorage.removeItem(STORAGE_KEY);
-    return defaultState;
+  // Hapus 1 produk dari Supabase
+  async deleteProductById(id) {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.error('Error deleteProductById:', error);
+  },
+
+  // Simpan / Update 1 catatan mutasi (Masuk/Keluar/Rusak/Return Barang Lebih)
+  async upsertMutation(mutationObj) {
+    const { error } = await supabase.from('mutations').upsert(mapMutToDb(mutationObj));
+    if (error) console.error('Error upsertMutation:', error);
+  },
+
+  // Hapus 1 catatan mutasi
+  async deleteMutationById(id) {
+    const { error } = await supabase.from('mutations').delete().eq('id', id);
+    if (error) console.error('Error deleteMutationById:', error);
+  },
+
+  // Simpan perubahan PIN Admin & Owner ke Cloud
+  async savePinsToCloud(pinsObj) {
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ key: 'pins', value: pinsObj });
+    if (error) console.error('Error savePinsToCloud:', error);
+  },
+
+  // Ganti seluruh data di Cloud (untuk fitur Data Contoh, Pulihkan Backup, atau Clear All)
+  async replaceAllCloudData(productsArray, mutationsArray) {
+    await supabase.from('mutations').delete().neq('id', '_none_');
+    await supabase.from('products').delete().neq('id', '_none_');
+
+    if (productsArray.length > 0) {
+      await supabase.from('products').insert(productsArray.map(mapProdToDb));
+    }
+    if (mutationsArray.length > 0) {
+      await supabase.from('mutations').insert(mutationsArray.map(mapMutToDb));
+    }
   },
 
   getSampleData() {
@@ -45,7 +125,7 @@ export const storageService = {
         {
           id: 'p_wp16_01',
           code: 'WP16-OAK01',
-          name: 'Wallpanel 16cm Motif Kayu Oak',
+          name: 'Wallpanel 16cm - Motif Kayu Oak',
           category: 'Wallpanel',
           unit: 'Lembar',
           costPrice: 85000,
@@ -56,7 +136,7 @@ export const storageService = {
         {
           id: 'p_wp30_02',
           code: 'WP30-WAL04',
-          name: 'Wallpanel 30cm Dark Walnut',
+          name: 'Wallpanel 30cm - Dark Walnut',
           category: 'Wallpanel',
           unit: 'Lembar',
           costPrice: 135000,
@@ -67,7 +147,7 @@ export const storageService = {
         {
           id: 'p_wb40_01',
           code: 'WB40-MRB02',
-          name: 'Wallboard 40cm Putih Carrara',
+          name: 'Wallboard 40cm - Putih Carrara',
           category: 'Wallboard',
           unit: 'Lembar',
           costPrice: 160000,
@@ -78,7 +158,7 @@ export const storageService = {
         {
           id: 'p_wb60_01',
           code: 'WB60-BLK09',
-          name: 'Wallboard 60cm Hitam Marmer',
+          name: 'Wallboard 60cm - Hitam Marmer',
           category: 'Wallboard',
           unit: 'Lembar',
           costPrice: 240000,
@@ -89,24 +169,13 @@ export const storageService = {
         {
           id: 'p_uv_01',
           code: 'UV-GLD01',
-          name: 'UV Board Motif Marmer Gold Line',
+          name: 'UV Board Standard (122x244cm) - Marmer Gold Line',
           category: 'UV Board',
           unit: 'Lembar',
           costPrice: 390000,
           sellPrice: 550000,
           stock: 3,
           minStock: 5
-        },
-        {
-          id: 'p_lwp_01',
-          code: 'LWP-OAK01',
-          name: 'List Wallpanel Ending Oak',
-          category: 'List Wallpanel',
-          unit: 'Batang',
-          costPrice: 35000,
-          sellPrice: 55000,
-          stock: 20,
-          minStock: 10
         },
         {
           id: 'p_la_t',
@@ -118,76 +187,11 @@ export const storageService = {
           sellPrice: 75000,
           stock: 2,
           minStock: 6
-        },
-        {
-          id: 'p_la_u',
-          code: 'ALU-U-BLK',
-          name: 'List Alumunium U - Hitam Doff',
-          category: 'List Alumunium',
-          unit: 'Batang',
-          costPrice: 42000,
-          sellPrice: 70000,
-          stock: 14,
-          minStock: 6
-        },
-        {
-          id: 'p_la_l',
-          code: 'ALU-L-SLV',
-          name: 'List Alumunium L Siku - Silver',
-          category: 'List Alumunium',
-          unit: 'Batang',
-          costPrice: 48000,
-          sellPrice: 80000,
-          stock: 12,
-          minStock: 6
-        },
-        {
-          id: 'p_lem_01',
-          code: 'SEAL-CLR',
-          name: 'Lem Sealant Konstruksi Heavy Duty',
-          category: 'Lem & Aksesoris',
-          unit: 'Tube / Botol',
-          costPrice: 32000,
-          sellPrice: 50000,
-          stock: 0,
-          minStock: 10
         }
       ],
       mutations: [
         {
           id: 'mut_sample_1',
-          type: 'IN',
-          date: today,
-          supplier: 'Supplier Utama 1',
-          projectName: '',
-          picName: 'Admin Gudang',
-          note: 'Restok mingguan Wallpanel & List',
-          items: [
-            {
-              productId: 'p_wp16_01',
-              code: 'WP16-OAK01',
-              name: 'Wallpanel 16cm Motif Kayu Oak',
-              unit: 'Lembar',
-              qty: 30,
-              returnedQty: 0,
-              costPrice: 85000,
-              sellPrice: 125000
-            },
-            {
-              productId: 'p_lwp_01',
-              code: 'LWP-OAK01',
-              name: 'List Wallpanel Ending Oak',
-              unit: 'Batang',
-              qty: 15,
-              returnedQty: 0,
-              costPrice: 35000,
-              sellPrice: 55000
-            }
-          ],
-          returnLogs: []
-        },
-        {
-          id: 'mut_sample_2',
           type: 'OUT',
           date: today,
           supplier: '',
@@ -198,38 +202,18 @@ export const storageService = {
             {
               productId: 'p_wp16_01',
               code: 'WP16-OAK01',
-              name: 'Wallpanel 16cm Motif Kayu Oak',
+              name: 'Wallpanel 16cm - Motif Kayu Oak',
               unit: 'Lembar',
               qty: 18,
-              returnedQty: 3, // 3 lembar tidak terpakai dan sudah balik ke stok ready
+              returnedQty: 3,
               costPrice: 85000,
               sellPrice: 125000
-            },
-            {
-              productId: 'p_uv_01',
-              code: 'UV-GLD01',
-              name: 'UV Board Motif Marmer Gold Line',
-              unit: 'Lembar',
-              qty: 2,
-              returnedQty: 0,
-              costPrice: 390000,
-              sellPrice: 550000
-            },
-            {
-              productId: 'p_la_t',
-              code: 'ALU-T-GLD',
-              name: 'List Alumunium T - Gold Mirror',
-              unit: 'Batang',
-              qty: 4,
-              returnedQty: 1,
-              costPrice: 45000,
-              sellPrice: 75000
             }
           ],
           returnLogs: [
             {
               date: today,
-              text: 'Barang lebih kembali ke stok ready: 3 Lembar Wallpanel 16cm Oak, 1 Batang List Alu T Gold'
+              text: 'Barang lebih masuk ke Stok Ready: 3 Lembar Wallpanel 16cm - Motif Kayu Oak'
             }
           ]
         }
