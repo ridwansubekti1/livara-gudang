@@ -170,9 +170,9 @@ Ukuran Bidang Dinding: *${wMeter}m (Lebar) × ${hMeter}m (Tinggi)* (${wallAreaM2
 Material Pilihan: *${prodLabel}*
 
 📦 *Rincian Kebutuhan Material:*
-• Kebutuhan Utama: *${finalSheetsNeeded} Lembar* ${includeWaste ? '(Sudah termasuk +5% cadangan potong)' : '(Pas tanpa cadangan)'}
-• Estimasi List Penutup/Siku: *~${estListBatang} Batang*
-• Estimasi Lem Sealant: *~${estSealantTubes} Tube*
+- Kebutuhan Utama: *${finalSheetsNeeded} Lembar* ${includeWaste ? '(Sudah termasuk +5% cadangan potong)' : '(Pas tanpa cadangan)'}
+- Estimasi List Penutup/Siku: *~${estListBatang} Batang*
+- Estimasi Lem Sealant: *~${estSealantTubes} Tube*
 ${estMaterialPrice > 0 ? `• Estimasi Nilai Material Utama: *${formatRupiah(estMaterialPrice)}*` : ''}
 
 📊 *Status Ketersediaan Gudang:*
@@ -352,88 +352,90 @@ ${statusText}`;
 
   return (
     <section className="space-y-3 sm:space-y-4 pb-28 sm:pb-20">
-      {/* ==================== STICKY COMPACT BAR SAAT SCROLL KE BAWAH (MODE SMARTPHONE) ==================== */}
+      {/* ==================== STICKY COMPACT BAR SAAT SCROLL KE BAWAH (SMARTPHONE & DESKTOP) ==================== */}
       {isScrolledDown && (
-        <div className="sm:hidden fixed top-[54px] left-0 right-0 z-25 bg-livara-creamLight/95 backdrop-blur-md border-b-2 border-livara-brown/25 shadow-md px-3 py-2 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
-          {/* Baris 1: 3 Info Stok (Lembar, Batang, Motif) + Kalkulator Dinding dalam 1 Pita Tipis */}
-          <div className="flex items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-extrabold">
-              <span className="bg-livara-cream px-2 py-0.5 rounded-lg border border-livara-brown/20 text-livara-brown">
-                {totalLembarReady} <span className="font-semibold text-[10px]">Lbr</span>
-              </span>
-              <span className="bg-livara-cream px-2 py-0.5 rounded-lg border border-livara-brown/20 text-stone-800">
-                {totalBatangReady} <span className="font-semibold text-[10px]">Btg</span>
-              </span>
-              <span className="bg-livara-brown text-livara-cream px-2 py-0.5 rounded-lg">
-                {totalSku} <span className="font-normal text-[10px]">Kode</span>
-              </span>
+        <div className="fixed top-[54px] sm:top-[134px] left-0 right-0 z-25 bg-livara-creamLight/95 backdrop-blur-md border-b-2 border-livara-brown/25 shadow-md px-3 sm:px-4 py-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="max-w-5xl mx-auto space-y-1.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            {/* Baris 1: 3 Info Stok (Lembar, Batang, Motif) + Kalkulator Dinding dalam 1 Pita Tipis */}
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-extrabold">
+                <span className="bg-livara-cream px-2.5 py-1 rounded-lg border border-livara-brown/20 text-livara-brown">
+                  {totalLembarReady} <span className="font-semibold text-[10px] sm:text-[11px]">Lembar</span>
+                </span>
+                <span className="bg-livara-cream px-2.5 py-1 rounded-lg border border-livara-brown/20 text-stone-800">
+                  {totalBatangReady} <span className="font-semibold text-[10px] sm:text-[11px]">Batang</span>
+                </span>
+                <span className="bg-livara-brown text-livara-cream px-2.5 py-1 rounded-lg">
+                  {totalSku} <span className="font-normal text-[10px] sm:text-[11px]">Kode</span>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEstimatorOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-400 text-amber-950 font-extrabold text-[10px] sm:text-xs flex items-center gap-1 shrink-0 transition"
+              >
+                <Ruler className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-livara-brown" />
+                <span>Hitung Dinding</span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsEstimatorOpen(true)}
-              className="px-2 py-0.5 rounded-lg bg-amber-100 border border-amber-400 text-amber-950 font-extrabold text-[10px] flex items-center gap-1 shrink-0"
-            >
-              <Ruler className="w-3 h-3 text-livara-brown" />
-              <span>Dinding</span>
-            </button>
-          </div>
-
-          {/* Baris 2: Warning Stok Habis & Menipis Versi Super Simpel (Klik Langsung Filter) */}
-          {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5">
-              {outOfStockItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilterStockStatus(filterStockStatus === 'HABIS' ? 'ALL' : 'HABIS')
-                  }
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 shrink-0 transition ${
-                    filterStockStatus === 'HABIS'
-                      ? 'bg-rose-700 text-white ring-2 ring-rose-300'
-                      : 'bg-rose-100 text-rose-900 border border-rose-300'
-                  }`}
-                >
-                  <AlertOctagon className="w-3 h-3" />
-                  <span>{outOfStockItems.length} Habis</span>
-                </button>
-              )}
-
-              {lowStockItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilterStockStatus(filterStockStatus === 'MENIPIS' ? 'ALL' : 'MENIPIS')
-                  }
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 shrink-0 transition ${
-                    filterStockStatus === 'MENIPIS'
-                      ? 'bg-amber-600 text-white ring-2 ring-amber-300'
-                      : 'bg-amber-100 text-amber-950 border border-amber-300'
-                  }`}
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>{lowStockItems.length} Menipis</span>
-                </button>
-              )}
-
-              {/* Tampilkan kode-kode kritis dalam 1 baris tipis yang bisa digeser */}
-              <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-stone-600 truncate">
-                {[...outOfStockItems, ...lowStockItems].slice(0, 4).map((item) => (
-                  <span
-                    key={item.id}
-                    onClick={() => (canEdit ? handleEdit(item) : setHistoryProduct(item))}
-                    className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                      Number(item.stock) <= 0
-                        ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                        : 'bg-amber-50 text-amber-900 border border-amber-200'
+            {/* Baris 2 (Di Desktop menyatu sebaris di sebelah kanan): Warning Stok Habis & Menipis */}
+            {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 sm:pt-0">
+                {outOfStockItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFilterStockStatus(filterStockStatus === 'HABIS' ? 'ALL' : 'HABIS')
+                    }
+                    className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-extrabold flex items-center gap-1 shrink-0 transition ${
+                      filterStockStatus === 'HABIS'
+                        ? 'bg-rose-700 text-white ring-2 ring-rose-300'
+                        : 'bg-rose-100 text-rose-900 border border-rose-300 hover:bg-rose-200'
                     }`}
                   >
-                    {item.code}:{item.stock}
-                  </span>
-                ))}
+                    <AlertOctagon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span>{outOfStockItems.length} Habis</span>
+                  </button>
+                )}
+
+                {lowStockItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFilterStockStatus(filterStockStatus === 'MENIPIS' ? 'ALL' : 'MENIPIS')
+                    }
+                    className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-extrabold flex items-center gap-1 shrink-0 transition ${
+                      filterStockStatus === 'MENIPIS'
+                        ? 'bg-amber-600 text-white ring-2 ring-amber-300'
+                        : 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span>{lowStockItems.length} Menipis</span>
+                  </button>
+                )}
+
+                {/* Tampilkan kode-kode kritis dalam 1 baris tipis */}
+                <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-mono font-bold text-stone-600 truncate">
+                  {[...outOfStockItems, ...lowStockItems].slice(0, 5).map((item) => (
+                    <span
+                      key={item.id}
+                      onClick={() => (canEdit ? handleEdit(item) : setHistoryProduct(item))}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+                        Number(item.stock) <= 0
+                          ? 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                          : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                      }`}
+                    >
+                      {item.code}:{item.stock}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

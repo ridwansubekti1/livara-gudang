@@ -164,7 +164,7 @@ export default function Header() {
                   title="Backup JSON"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Backup</span>
+                  <span className="hidden md:inline">Cadangkan</span>
                 </button>
 
                 <label
@@ -185,6 +185,7 @@ export default function Header() {
                 title="Hapus Semua Data"
               >
                 <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Hapus Data</span>
               </button>
             )}
 
