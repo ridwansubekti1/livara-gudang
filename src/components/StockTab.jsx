@@ -353,19 +353,20 @@ ${statusText}`;
   return (
     <section className="space-y-3 sm:space-y-4 pb-28 sm:pb-20">
       {/* ==================== STICKY COMPACT BAR SAAT SCROLL KE BAWAH (SMARTPHONE & DESKTOP) ==================== */}
+{/* ==================== STICKY COMPACT BAR SAAT SCROLL KE BAWAH (RAPI & TIDAK MEPET) ==================== */}
       {isScrolledDown && (
-        <div className="fixed top-[54px] sm:top-[134px] left-0 right-0 z-25 bg-livara-creamLight/95 backdrop-blur-md border-b-2 border-livara-brown/25 shadow-md px-3 sm:px-4 py-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="max-w-5xl mx-auto space-y-1.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
-            {/* Baris 1: 3 Info Stok (Lembar, Batang, Motif) + Kalkulator Dinding dalam 1 Pita Tipis */}
-            <div className="flex items-center justify-between sm:justify-start gap-2">
+        <div className="sticky top-[64px] sm:top-[148px] z-25 pt-1 pb-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="bg-livara-creamLight/95 backdrop-blur-md border-2 border-livara-brown/30 rounded-2xl shadow-lg px-3.5 sm:px-5 py-2.5 sm:py-3 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            {/* Sisi Kiri: Info Stok (Lembar, Batang, Kode) + Kalkulator Dinding dengan jarak lega */}
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-2.5">
               <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-extrabold">
-                <span className="bg-livara-cream px-2.5 py-1 rounded-lg border border-livara-brown/20 text-livara-brown">
+                <span className="bg-livara-cream px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-livara-brown/20 text-livara-brown shadow-2xs">
                   {totalLembarReady} <span className="font-semibold text-[10px] sm:text-[11px]">Lembar</span>
                 </span>
-                <span className="bg-livara-cream px-2.5 py-1 rounded-lg border border-livara-brown/20 text-stone-800">
+                <span className="bg-livara-cream px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-livara-brown/20 text-stone-800 shadow-2xs">
                   {totalBatangReady} <span className="font-semibold text-[10px] sm:text-[11px]">Batang</span>
                 </span>
-                <span className="bg-livara-brown text-livara-cream px-2.5 py-1 rounded-lg">
+                <span className="bg-livara-brown text-livara-cream px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-2xs">
                   {totalSku} <span className="font-normal text-[10px] sm:text-[11px]">Kode</span>
                 </span>
               </div>
@@ -373,29 +374,29 @@ ${statusText}`;
               <button
                 type="button"
                 onClick={() => setIsEstimatorOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-400 text-amber-950 font-extrabold text-[10px] sm:text-xs flex items-center gap-1 shrink-0 transition"
+                className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-400 text-amber-950 font-extrabold text-[10px] sm:text-xs flex items-center gap-1.5 shrink-0 transition shadow-2xs"
               >
-                <Ruler className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-livara-brown" />
+                <Ruler className="w-3.5 h-3.5 text-livara-brown" />
                 <span>Hitung Dinding</span>
               </button>
             </div>
 
-            {/* Baris 2 (Di Desktop menyatu sebaris di sebelah kanan): Warning Stok Habis & Menipis */}
+            {/* Sisi Kanan: Warning Stok Habis & Menipis */}
             {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 sm:pt-0">
+              <div className="flex items-center gap-2 overflow-x-auto pt-0.5 sm:pt-0">
                 {outOfStockItems.length > 0 && (
                   <button
                     type="button"
                     onClick={() =>
                       setFilterStockStatus(filterStockStatus === 'HABIS' ? 'ALL' : 'HABIS')
                     }
-                    className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-extrabold flex items-center gap-1 shrink-0 transition ${
+                    className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition ${
                       filterStockStatus === 'HABIS'
                         ? 'bg-rose-700 text-white ring-2 ring-rose-300'
                         : 'bg-rose-100 text-rose-900 border border-rose-300 hover:bg-rose-200'
                     }`}
                   >
-                    <AlertOctagon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <AlertOctagon className="w-3.5 h-3.5" />
                     <span>{outOfStockItems.length} Habis</span>
                   </button>
                 )}
@@ -406,30 +407,30 @@ ${statusText}`;
                     onClick={() =>
                       setFilterStockStatus(filterStockStatus === 'MENIPIS' ? 'ALL' : 'MENIPIS')
                     }
-                    className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-extrabold flex items-center gap-1 shrink-0 transition ${
+                    className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition ${
                       filterStockStatus === 'MENIPIS'
                         ? 'bg-amber-600 text-white ring-2 ring-amber-300'
                         : 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200'
                     }`}
                   >
-                    <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <AlertTriangle className="w-3.5 h-3.5" />
                     <span>{lowStockItems.length} Menipis</span>
                   </button>
                 )}
 
-                {/* Tampilkan kode-kode kritis dalam 1 baris tipis */}
-                <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-mono font-bold text-stone-600 truncate">
-                  {[...outOfStockItems, ...lowStockItems].slice(0, 5).map((item) => (
+                {/* Kode Kritis */}
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono font-bold text-stone-600 truncate">
+                  {[...outOfStockItems, ...lowStockItems].slice(0, 4).map((item) => (
                     <span
                       key={item.id}
                       onClick={() => (canEdit ? handleEdit(item) : setHistoryProduct(item))}
-                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+                      className={`px-2 py-1 rounded-lg cursor-pointer transition ${
                         Number(item.stock) <= 0
                           ? 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
                           : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
                       }`}
                     >
-                      {item.code}:{item.stock}
+                      {item.code}: {item.stock}
                     </span>
                   ))}
                 </div>
