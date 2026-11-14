@@ -209,7 +209,7 @@ export default function Header() {
                 title="Kunci Kembali ke Mode Lihat Saja"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Kunci</span>
+                <span className="hidden sm:inline">Logout</span>
               </button>
             )}
           </div>
