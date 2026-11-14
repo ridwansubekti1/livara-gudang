@@ -225,7 +225,7 @@ _Harap cek jumlah fisik sebelum berangkat. Jika ada sisa barang lebih (tidak ter
             onClick={() => setIsLoginModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-livara-brown text-livara-cream font-extrabold text-xs"
           >
-            Login Admin Sekarang
+            Login
           </button>
         </div>
       ) : (

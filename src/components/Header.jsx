@@ -414,10 +414,10 @@ export default function Header() {
 
               <div className="bg-livara-cream p-3 rounded-xl border border-livara-brown/15 text-[11px] text-stone-600 text-left space-y-1">
                 <p>
-                  • <strong>PIN Admin Gudang (Default: 1111):</strong> Bisa ubah stok (+/-), tambah barang, & catat keluar/masuk proyek.
+                  • <strong>PIN Admin Gudang :</strong> Bisa ubah stok (+/-), tambah barang, & catat keluar/masuk proyek.
                 </p>
                 <p>
-                  • <strong>PIN Owner (Default: 1234):</strong> Akses penuh termasuk membuka tab Harga Beli & Aset Modal.
+                  • <strong>PIN Owner :</strong> Akses penuh termasuk membuka tab Harga Beli & Aset Modal.
                 </p>
               </div>
 
